@@ -1,3 +1,4 @@
+import random
 Min_Bet = 5
 Max_Bet = 1000
 
@@ -21,8 +22,7 @@ def Playing_Card(deck):
     for i in range (2):
         dealer_hand.append(deck.pop())
         player_hand.append(deck.pop())
-    print("Dealer's hand:", dealer_hand[0])
-    print("Player's hand:", player_hand)
+
     return dealer_hand, player_hand
 
 def Deck_Card():
@@ -36,21 +36,75 @@ def Deck_Card():
         for rank in ranks:
             card = [rank + ' of ' + suit]
             deck.append(card)
+
+    random.shuffle(deck)
     return deck
 
 
 def main():
+
+    try:
+        with open('money.txt', 'r') as f:
+            player_money = float(f.readline())
+    except FileNotFoundError:
+
+        player_money = Max_Bet
+
     print("Welcome to BLACK JACK!")
     player_bet = float(input("How much would you like to bet? "))
-    if player_bet < Min_Bet or player_bet > Max_Bet:
+
+    if player_bet < Min_Bet or player_bet > player_money:
         print("Invalid bet amount. The minimum bet you can enter is 5")
-    player_money = Max_Bet
+        return
+
+
     player_money -= player_bet
     deck = Deck_Card()
     dealer_hand, player_hand = Playing_Card(deck)
+
     player_hand_total = Black_Jack_Hand(player_hand)
     dealer_hand_total = Black_Jack_Hand(dealer_hand)
-    print("Player's total:", player_hand_total)
+
+    while Black_Jack_Hand(dealer_hand) < 17:
+        dealer_hand.append(deck.pop())
+        print("Dealer draws a card")
+
+    if player_hand_total == 21:
+        print("Congratulations! You have a blackjack!")
+        player_money += round(player_bet * 1.5, 2)
+        print("Your balance is", player_money)
+    elif dealer_hand_total == 21:
+        print("Dealer won! You lose.")
+        player_money -= player_bet
+        print("Your balance", player_money)
+    else:
+        while Black_Jack_Hand(player_hand) < 21:
+            action = input ("Hit or stand? (hit/stand) ")
+            if action == 'hit':
+                player_hand.append(deck.pop())
+                print("Your cards:", player_hand)
+            elif action == 'stand':
+                break
+
+        if dealer_hand_total > 21:
+            print("Dealer busts!")
+            player_money += round(player_bet * 2, 2)
+        elif player_hand_total > dealer_hand_total:
+            print("Player wins!")
+            player_money += round(player_bet * 2, 2)
+        elif player_hand_total == dealer_hand_total:
+            print("It is a tie!")
+            player_money += player_bet
+            print("Your balance is", player_money)
+
+
+
+    with open('money.txt', 'w') as f:
+        f.write(str(player_money))
+
+    play_again = input("Do you want to play again? (y/n) ")
+    if play_again.lower() == "y":
+        main()
 
 if __name__ == '__main__':
     main()
