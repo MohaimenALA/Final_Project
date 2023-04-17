@@ -1,110 +1,196 @@
+import csv
+from db import read_money_amount, write_money_amount
 import random
-Min_Bet = 5
-Max_Bet = 1000
 
-def Black_Jack_Hand(hand):
-    total = 0
-    ace_count = sum(card[0] == 'Ace' for card in hand)
 
-    for i in range(ace_count):
-        if total + 11 <= 21:
-            total += 11
+SUITS = ["Hearts", "Diamonds", "Clubs", "Spades"]
+RANKS = ["Ace", "2", "3", "4", "5", "6", "7", "8", "9", "10", "Jack", "Queen", "King"]
+VALUES = {"Ace": 11, "2": 2, "3": 3, "4": 4, "5": 5, "6": 6, "7": 7, "8": 8, "9": 9, "10": 10, "Jack": 10, "Queen": 10, "King": 10}
+
+
+def get_bet_amount(player_money):
+    """
+    Asks the player for the bet amount and returns the bet amount
+    """
+    while True:
+        try:
+            bet_amount = float(input(f"Enter your bet amount (you have {player_money}$): "))
+            if bet_amount <= 0:
+                print("Bet amount must be greater than zero.")
+            elif bet_amount > player_money:
+                print("You don't have enough money to make this bet.")
+            else:
+                return bet_amount
+        except ValueError:
+            print("Invalid input. Please enter a valid bet amount.")
+
+
+def get_card(deck):
+    """
+    Draws a card from the deck and returns the card
+    """
+    return deck.pop()
+
+
+def deal_initial_hands(deck, dealer_hand, player_hand):
+    """
+    Deals two cards to the dealer and two cards to the player
+    """
+    for _ in range(2):
+        dealer_hand.append(get_card(deck))
+        player_hand.append(get_card(deck))
+
+
+def display_hands(dealer_hand, player_hand, show_dealer_hand=False):
+    """
+    Displays the dealer's and player's hands
+    """
+    print("\nDealer's Hand:")
+    if show_dealer_hand:
+        for card in dealer_hand:
+            print(f"  {card[0]} of {card[1]}")
+    else:
+        print(f"  {dealer_hand[0][0]} of {dealer_hand[0][1]}")
+        print("  <card hidden>")
+
+    print("\nPlayer's Hand:")
+    for card in player_hand:
+        print(f"  {card[0]} of {card[1]}")
+    print("")
+
+
+def player_turn(deck, dealer_hand, player_hand):
+    """
+    Allows the player to draw cards until they stand or bust
+    """
+    while True:
+        action = input("Do you want to Hit or Stand? ").lower()
+        if action == "hit":
+            player_hand.append(get_card(deck))
+            display_hands(dealer_hand, player_hand)
+            if get_hand_value(player_hand) > 21:
+                print("Bust! You lose.")
+                return "bust"
+        elif action == "stand":
+            return "stand"
         else:
-            total +=1
-    for card in hand:
-        if card[0] != 'Ace':
-            total += card [1]
-    return total
-def Playing_Card(deck):
-    dealer_hand = []
-    player_hand = []
+            print("Invalid input. Please enter Hit or Stand.")
 
-    for i in range (2):
-        dealer_hand.append(deck.pop())
-        player_hand.append(deck.pop())
 
-    return dealer_hand, player_hand
+def dealer_turn(deck, dealer_hand):
+    """
+    Allows the dealer to draw cards until they have at least 17 points or bust
+    """
+    while get_hand_value(dealer_hand) < 17:
+        dealer_hand.append(get_card(deck))
+        display_hands(dealer_hand, player_hand, show_dealer_hand=True)
+        if get_hand_value(dealer_hand) > 21:
+            print("Dealer busts! You win.")
+            return "dealer bust"
+    return "stand"
 
-def Deck_Card():
-    deck = []
-    suits = ['Hearts', 'Diamonds', 'Clubs', 'Spades']
-    ranks = ['Ace', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'Jack', 'Queen', 'King']
-    points = {'Ace': 1, '2': 2, '3': 3, '4': 4, '5': 5, '6': 6, '7': 7, '8': 8,
-              '9': 9, '10': 10, 'Jack': 10, 'Queen': 10, 'King': 10}
 
-    for suit in suits:
-        for rank in ranks:
-            card = [rank + ' of ' + suit]
-            deck.append(card)
+def get_hand_value(hand):
+    """
+    Calculates the value of a hand and returns the value
+    """
+    # Calculate the total value of the hand
+    value = sum(VALUES[card[0]] for card in hand)
 
-    random.shuffle(deck)
-    return deck
+    # If the hand has an Ace and the total value is greater than 21, reduce the value of the Ace from 11 to 1
+    num_aces = sum(1 for card in hand if card[0] == "Ace")
+    while value > 21 and num_aces > 0:
+        value -= 10
+        num_aces -= 1
+
+    return value
+
+
+def payout(player_hand, dealer_hand, bet_amount):
+    """
+    Calculates the payout for the player and updates the player's money amount
+    """
+    player_hand_value = get_hand_value(player_hand)
+    dealer_hand_value = get_hand_value(dealer_hand)
+
+    if player_hand_value == 21 and len(player_hand) == 2:
+        print("Blackjack! You win.")
+        payout_amount = bet_amount * 1.5
+    elif dealer_hand_value > 21:
+        print("Dealer busts! You win.")
+        payout_amount = bet_amount
+    elif player_hand_value > dealer_hand_value:
+        print("You win.")
+        payout_amount = bet_amount
+    elif player_hand_value < dealer_hand_value:
+        print("You lose.")
+        payout_amount = -bet_amount
+    else:
+        print("Push.")
+        payout_amount = 0
+
+    return payout_amount
 
 
 def main():
-
-    try:
-        with open('money.txt', 'r') as f:
-            player_money = float(f.readline())
-    except FileNotFoundError:
-
-        player_money = Max_Bet
-
-    print("Welcome to BLACK JACK!")
-    player_bet = float(input("How much would you like to bet? "))
-
-    if player_bet < Min_Bet or player_bet > player_money:
-        print("Invalid bet amount. The minimum bet you can enter is 5")
-        return
-
-
-    player_money -= player_bet
-    deck = Deck_Card()
-    dealer_hand, player_hand = Playing_Card(deck)
-
-    player_hand_total = Black_Jack_Hand(player_hand)
-    dealer_hand_total = Black_Jack_Hand(dealer_hand)
-
-    while Black_Jack_Hand(dealer_hand) < 17:
-        dealer_hand.append(deck.pop())
-        print("Dealer draws a card")
-
-    if player_hand_total == 21:
-        print("Congratulations! You have a blackjack!")
-        player_money += round(player_bet * 1.5, 2)
-        print("Your balance is", player_money)
-    elif dealer_hand_total == 21:
-        print("Dealer won! You lose.")
-        player_money -= player_bet
-        print("Your balance", player_money)
-    else:
-        while Black_Jack_Hand(player_hand) < 21:
-            action = input ("Hit or stand? (hit/stand) ")
-            if action == 'hit':
-                player_hand.append(deck.pop())
-                print("Your cards:", player_hand)
-            elif action == 'stand':
+    # Read the player's money amount from the file
+    player_money = read_money_amount()
+    print("Welcome to BlackJack")
+    print()
+    while True:
+        # Check if the player has enough money to play
+        if player_money < 5:
+            print("You don't have enough money to make the minimum bet. Please buy more chips.")
+            buy_chips = input("Do you want to buy chips? (y/n) ").lower()
+            if buy_chips == "y":
+                player_money += 100
+                write_money_amount(player_money)
+            else:
                 break
 
-        if dealer_hand_total > 21:
-            print("Dealer busts!")
-            player_money += round(player_bet * 2, 2)
-        elif player_hand_total > dealer_hand_total:
-            print("Player wins!")
-            player_money += round(player_bet * 2, 2)
-        elif player_hand_total == dealer_hand_total:
-            print("It is a tie!")
-            player_money += player_bet
-            print("Your balance is", player_money)
+        # Get the bet amount from the player
+        bet_amount = get_bet_amount(player_money)
 
+        # Create the deck of cards
+        deck = []
+        for suit in SUITS:
+            for rank in RANKS:
+                deck.append([rank, suit])
 
+        # Shuffle the deck
+        random.shuffle(deck)
 
-    with open('money.txt', 'w') as f:
-        f.write(str(player_money))
+        # Deal the initial hands
+        dealer_hand = []
+        player_hand = []
+        deal_initial_hands(deck, dealer_hand, player_hand)
 
-    play_again = input("Do you want to play again? (y/n) ")
-    if play_again.lower() == "y":
-        main()
+        # Display the hands
+        display_hands(dealer_hand, player_hand)
 
-if __name__ == '__main__':
+        # Player's turn
+        player_result = player_turn(deck, dealer_hand, player_hand)
+
+        # Dealer's turn
+        if player_result != "bust":
+            dealer_result = dealer_turn(deck, dealer_hand)
+        else:
+            dealer_result = ""
+
+        # Payout
+        if dealer_result != "dealer bust":
+            payout_amount = payout(player_hand, dealer_hand, bet_amount)
+            player_money += payout_amount
+            write_money_amount(player_money)
+
+        # Display the hands again with the dealer's hand revealed
+        display_hands(dealer_hand, player_hand, show_dealer_hand=True)
+
+        # Check if the player wants to play again
+        play_again = input(f"You have {player_money}$. Do you want to play again? (y/n) ").lower()
+        if play_again != "y":
+            break
+        print("bye!")
+
+if __name__ == "__main__":
     main()
